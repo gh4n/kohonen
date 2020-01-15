@@ -1,74 +1,102 @@
-#%%
 import numpy as np
 import matplotlib.pyplot as plt
 import math
-from itertools import cycle
-#%%
+import logging
+import multiprocessing
 
-#%%
-# constants
-HEIGHT = 100
-WIDTH = 100
-MAX_ITERATIONS = 1000
-INITIAL_RADIUS = max(WIDTH, HEIGHT) / 2
-TIME_CONST = MAX_ITERATIONS / math.log10(INITIAL_RADIUS)
-print(TIME_CONST)
-INITIAL_LEARNING_RATE = 0.1
-#%%
+class Kohonen:
 
-#%%
-# initialize random test data
-np.random.seed(1023)
-data = np.random.random((1, 20, 3))
-#%%
+    def __init__(self):
+        # parse from config file -- for production deployment 
+        # OR from command line -- for running experiments while developing
+        self.HEIGHT = 100
+        self.WIDTH = 100
+        self.MAX_ITERATIONS 
+        self.INITIAL_RADIUS = max(self.WIDTH, self.HEIGHT) / 2
+        self.TIME_CONST = MAX_ITERATIONS / math.log10(self.INITIAL_RADIUS)
+        self.INITIAL_LEARNING_RATE = 0.1
+        self.WORKERS = 10
+        self.network = None
+        self.data = None
 
-#%%
-# initialize network
-shape = (HEIGHT, WIDTH, 3)
-network = np.random.random_sample(shape)
-#%%
+    def init_network(self, seed):
+        np.random.seed(seed)
+        shape = (self.HEIGHT, self.WIDTH, 3)
+        return np.random.random_sample(shape)
 
-#%%
-# returns euclidean distance between two vectors - a, b
-def distance_weight(a, b):
-    d = np.subtract(a, b)
-    d_2 = np.square(d)
-    return math.sqrt(np.sum(d_2))
-#%%
+    def gen_data(self, size, seed=None):
+        np.random.seed(seed)
+        return np.random.random((1, size, 3))
 
-#%%
-# node x, y || BMU x, y
-def distance(w_x, w_y, z_x, z_y):
-    print(f"node {w_x}, {w_y} | bmu {z_x}, {z_y}")
-    x_2 = (w_x - z_x) ** 2
-    y_2 = (w_y - z_y) ** 2
-    d_2 = x_2 + y_2
-    return math.sqrt(d_2)
-#%%
+    def euclidean_dist(self, a, b):
+        d = np.subtract(a, b)
+        d_2 = np.square(d)
+        return math.sqrt(np.sum(d_2))
 
-#%%
-# learning rate
-def learing_rate(t):
-    return INITIAL_LEARNING_RATE * math.exp(-1 * t / TIME_CONST)
-#%%
+    def distance(self, w_x, w_y, z_x, z_y):
+        x_2 = (w_x - z_x) ** 2
+        y_2 = (w_y - z_y) ** 2
+        d_2 = x_2 + y_2
+        return math.sqrt(d_2)
+    
+    def learing_rate(self, timestep):
+        return INITIAL_LEARNING_RATE * math.exp(-1 * timestep / TIME_CONST)
+    
+    def radius(self, timestep):
+        return INITIAL_RADIUS * math.exp(-1 * timestep / TIME_CONST)
+    
+    # return if node is located within the radius
+    # around node (centre)
+    def in_radius(self, x_c, y_c, x_n, y_n, r):
+        return (x_n - x_c) ** 2 + (y_n - y_c) ** 2 < r ** 2
+    
+    # influence decay
+    def influence(self, w_x, w_y, z_x, z_y, t):
+        d = distance(w_x, w_y, z_x, z_y)
+        r = radius(t)
+        return math.exp((-1 * d ** 2) / (2 * r ** 2))
+    
+    # update weights
+    def update(self, network, w_x, w_y, v_x, v_y, t):
+        w = network[w_x][w_y]
+        v = network[v_x][v_y]
+        d = np.subtract(v, w)
+        inf = influence(w_x, w_y, v_x, v_y, t)
+        lr = learing_rate(t)
+        scalar = lr * inf
+        correction = np.multiply(scalar, d)
+        return np.add(w, correction)
 
-#%%
-# radius
-def radius(t):
-    return INITIAL_RADIUS * math.exp(-1 * t / TIME_CONST)
+    def bmu(self, in_vec, network):
+        min = float("inf")
+        b = None
+        for i in range(len(network)):
+            for j in range(len(network[i])):
+                dist = distance_weight(in_vec, network[i][j])
+                if dist < min:
+                    min = dist
+                    b = (network[i][j], i, j)
+                # print(f"euclidean dist: {distance_weight(in_vec, network[i][j])}")
+        # print(bmu)
+        return b
+    
+    def train(self, network, data):
+        for t in range(1, self.MAX_ITERATIONS):
+            ind = t % len(data[0])
+            in_vec = data[0][ind]
+            b = bmu(in_vec, network)
+            print(f" invec {in_vec}, bmu {b}")
+            
+            r = radius(t)
+            for i in range(len(network)):
+                for j in range(len(network[i])):
+                    if in_radius(b[1],b[2], i, j, r):
+                        prev = network[i][j]
+                        up = update(network, i, j, b[1], b[2], t)
+                        print(f"prev {prev}, up {up}")
+                        network[i][j] = up
 
-for i in range(1, 1000):
-    print(radius(i))
-#%%
 
-#%%
-shape = (HEIGHT, WIDTH, 3)
-network = np.random.random_sample(shape)
-
-# return if node is located within the radius
-# around node (centre)
-def in_radius(x_c, y_c, x_n, y_n, r):
-    return (x_n - x_c) ** 2 + (y_n - y_c) ** 2 < r ** 2
 
 r = 5
 for i in range(len(network)):
@@ -80,70 +108,7 @@ plt.imshow(network)
 plt.show()
 
             
-#%%
 
-#%%
-# influence decay
-def influence(w_x, w_y, z_x, z_y, t):
-    d = distance(w_x, w_y, z_x, z_y)
-    print(f"distance {d}")
-    r = radius(t)
-    return math.exp((-1 * d ** 2) / (2 * r ** 2))
-#%%
-
-#%%
-# update weights
-def update(network, w_x, w_y, v_x, v_y, t):
-    w = network[w_x][w_y]
-    v = network[v_x][v_y]
-    d = np.subtract(v, w)
-    inf = influence(w_x, w_y, v_x, v_y, t)
-    lr = learing_rate(t)
-    # print(f"influence {inf}, lr {lr}")
-    scalar = lr * inf
-    # print(f"scalar {scalar}")
-    correction = np.multiply(scalar, d)
-    return np.add(w, correction)
-#%%
-
-
-#%%
-def bmu(in_vec, network):
-    min = float("inf")
-    b = None
-    for i in range(len(network)):
-        for j in range(len(network[i])):
-            dist = distance_weight(in_vec, network[i][j])
-            if dist < min:
-                min = dist
-                b = (network[i][j], i, j)
-            # print(f"euclidean dist: {distance_weight(in_vec, network[i][j])}")
-    # print(bmu)
-    return b
-#%%
-
-#%%
-def train(network, data):
-    cycle(data)
-    for t in range(1, MAX_ITERATIONS):
-        ind = t % len(data[0])
-        in_vec = data[0][ind]
-        b = bmu(in_vec, network)
-        print(f" invec {in_vec}, bmu {b}")
-        
-        r = radius(t)
-        for i in range(len(network)):
-            for j in range(len(network[i])):
-                if in_radius(b[1],b[2], i, j, r):
-                    prev = network[i][j]
-                    up = update(network, i, j, b[1], b[2], t)
-                    print(f"prev {prev}, up {up}")
-                    network[i][j] = up
-
-#%%
-
-
-#%%
 print(data)
 plt.imshow(data)
 # plt.imshow(network)
