@@ -2,10 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import math
-import logging
 import multiprocessing as mp
-import os
 from pathlib import Path
+import os
 
 
 class Kohonen:
