@@ -9,7 +9,7 @@ import multiprocessing
 
 class Kohonen:
 
-    def __init__(self, height, width, max_iterations, initial_learning_rate, workers, network=None, data=None, seed=42):
+    def __init__(self, height, width, max_iterations, initial_learning_rate, workers, network=None, data=None, dataset_size=20, seed=42):
         self.HEIGHT = height
         self.WIDTH = width
         self.MAX_ITERATIONS = max_iterations
@@ -17,7 +17,7 @@ class Kohonen:
         self.WORKERS = workers
 
         self.network = network if network else self.init_network(seed)
-        self.data = data if data else self.gen_data(seed)
+        self.data = data if data else self.gen_data(dataset_size, seed)
 
         self.INITIAL_RADIUS = max(self.WIDTH, self.HEIGHT) / 2
         self.TIME_CONST = MAX_ITERATIONS / math.log10(self.INITIAL_RADIUS)
@@ -43,7 +43,7 @@ class Kohonen:
         d_2 = x_2 + y_2
         return math.sqrt(d_2)
     
-    def learing_rate(self, timestep):
+    def get_learing_rate(self, timestep):
         return self.INITIAL_LEARNING_RATE * math.exp(-1 * timestep / self.TIME_CONST)
     
     def radius(self, timestep):
@@ -54,9 +54,9 @@ class Kohonen:
             around `centre_x, centre_y` """
         return (node_x - centre_x) ** 2 + (node_y - centre_y) ** 2 < r ** 2
     
-    def calculate_influence(self, node_x, node_y, bmu_x, bmu_y, timestep):
+    def get_influence(self, node_x, node_y, bmu_x, bmu_y, timestep):
         d = self.distance(node_x, node_y, bmu_x, bmu_y)
-        r = self.radius(t)
+        r = self.radius(timestep)
         return math.exp((-1 * d ** 2) / (2 * r ** 2))
     
     def update_weights(self, node_x, node_y, bmu_x, bmu_y, timestep):
@@ -65,19 +65,20 @@ class Kohonen:
         d = np.subtract(bmu, node)
 
         # calculate influence and learning rate
-        influence = self.calculate_influence(node_x, node_y, bmu_x, bmu_y, timestep)
-        learning_rate = self.calculate_learing_rate(timestep)
+        influence = self.get_influence(node_x, node_y, bmu_x, bmu_y, timestep)
+        learning_rate = self.get_learing_rate(timestep)
         scalar = influence * learning_rate
         correction = np.multiply(scalar, d)
         return np.add(node, correction)
 
     def get_bmu(self, in_vec):
         bmu = None
+        min = float("inf")
         for col in range(len(self.network)):
-            for row in range(len(self.network[i])):
+            for row in range(len(self.network[col])):
                 # use multiprocessing to parallelize euclidean distance calculation
                 # pool = multiprocessing.Pool(self.WORKERS)
-                dist = self.distance_weight(in_vec, self.network[col][row])
+                dist = self.euclidean_dist(in_vec, self.network[col][row])
                 if dist < min:
                     min = dist
                     bmu = (col, row)
@@ -86,13 +87,13 @@ class Kohonen:
     def train(self):
         """ Updates `network` for """
         for timestep in range(1, self.MAX_ITERATIONS):
-            i = t % len(data[0])
-            in_v = data[0][i]
-            bmu = self.get_bmu(in_v, self.network)
+            i = timestep % len(self.data[0])
+            in_v = self.data[0][i]
+            bmu = self.get_bmu(in_v)
             
             r = self.radius(timestep)
             for col in range(len(self.network)):
-                for row in range(len(self.network[i])):
+                for row in range(len(self.network[col])):
                     if self.in_radius(bmu[0], bmu[1], col, row, r):
                         self.network[col][row] = self.update_weights(col, row, bmu[0], bmu[1], timestep)
 
@@ -106,8 +107,8 @@ class Kohonen:
 if __name__ == "__main__":
     # Parse from config file -- for CI/CD and production deployment
     # Or from command line -- for running experiments while developing
-    HEIGHT = 100
-    WIDTH = 100
+    HEIGHT = 10
+    WIDTH = 10
     MAX_ITERATIONS = 1000
     INITIAL_LEARNING_RATE = 0.1
     WORKERS = 10
@@ -115,8 +116,9 @@ if __name__ == "__main__":
     # We should be able to import a partially trained network and training data on disk
     DATA = None
     network = None
-    k = Kohonen()
-
+    k = Kohonen(HEIGHT, WIDTH, MAX_ITERATIONS, INITIAL_LEARNING_RATE, WORKERS)
+    k.train()
+    k.show()
 
 
 
