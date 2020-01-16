@@ -1,4 +1,4 @@
-Simple implementation of a Kohonen Self Organising Map.
+#### Simple implementation of a Kohonen Self Organising Map.
 
 To run it is simply, `python3 kohonen.py`
 provided you have `numpy` and `matplotlib` installed:
