@@ -1,8 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 import math
 import logging
 import multiprocessing as mp
+import os
+from pathlib import Path
 
 
 class Kohonen:
@@ -150,12 +153,17 @@ class Kohonen:
     def save(self, save_fp):
         """ Utility function to save state data to directory `save_fp` """
 
+        # Ensures directory exists and creates it if it doesn't
+        Path(save_fp).mkdir(parents=True, exist_ok=True)
+
         with open(f"{save_fp}/network", 'w+') as f:
             f.write(str(self.network))
         
         with open(f"{save_fp}/data", 'w+') as f:
             f.write(str(self.data))
 
+        matplotlib.image.imsave(f"{save_fp}/network.png", self.network)
+        matplotlib.image.imsave(f"{save_fp}/data.png", self.data)
 
 
 if __name__ == "__main__":
@@ -163,7 +171,7 @@ if __name__ == "__main__":
     # Or from command line -- for running experiments while developing
     HEIGHT = 100
     WIDTH = 100
-    MAX_ITERATIONS = 500
+    MAX_ITERATIONS = 1000
     INITIAL_LEARNING_RATE = 0.1
     WORKERS = 4
 
@@ -173,6 +181,6 @@ if __name__ == "__main__":
     k = Kohonen(HEIGHT, WIDTH, MAX_ITERATIONS, INITIAL_LEARNING_RATE, WORKERS)
     k.train()
     k.show_network()
-    k.save("here")
+    k.save('res')
 
 
